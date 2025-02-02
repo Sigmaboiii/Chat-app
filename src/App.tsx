@@ -6,17 +6,17 @@ import { useAuthStore } from './store/authStore';
 import { AuthForm } from './components/auth/AuthForm';
 import { Canvas } from '@react-three/fiber';
 import { Stars, OrbitControls } from '@react-three/drei';
-import { ChevronRight, ChevronLeft, Search, Bell, Settings, ShoppingBag, X } from 'lucide-react';
+import { ChevronRight, ChevronLeft, Search, Bell, Settings, ShoppingBag, UserPlus, X } from 'lucide-react';
 import { useThemeStore } from './store/themeStore';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ThemeToggle } from './components/ThemeToggle';
 import { UserMenu } from './components/user/UserMenu';
 import { FriendRequestsModal } from './components/friends/FriendRequestsModal';
+import { AddFriendModal } from './components/friends/AddFriendModal';
 import { AnimationShop } from './components/shop/AnimationShop';
 import { SpaceScene } from './components/three/SpaceScene';
 import { Earth } from './components/three/Earth';
 import { useFriendStore } from './store/friendStore';
-import { AddFriendModal } from './components/friends/AddFriendModal';
 
 function App() {
   const { setUser, setLoading, user, loading } = useAuthStore();
