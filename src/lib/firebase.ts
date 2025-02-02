@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
+import { getFirestore, collection, addDoc, query, where, getDocs } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 
 const firebaseConfig = {
@@ -12,9 +12,12 @@ const firebaseConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID
 };
 
-// Initialize Firebase with error handling
 let app;
 try {
+  if (!firebaseConfig.apiKey) {
+    throw new Error('Firebase configuration is missing. Please set up your environment variables.');
+  }
+  
   app = initializeApp(firebaseConfig);
   console.log('Firebase initialized successfully');
 } catch (error) {
@@ -22,17 +25,41 @@ try {
   throw error;
 }
 
-// Initialize services with error handling
 export const auth = getAuth(app);
 export const db = getFirestore(app);
 export const storage = getStorage(app);
 
-// Remove emulator connections as they're causing connection issues
-// Add connection status monitoring
-auth.onAuthStateChanged((user) => {
+// Helper function to check if user exists
+export const checkUserExists = async (email: string) => {
+  try {
+    const usersRef = collection(db, 'users');
+    const q = query(usersRef, where('email', '==', email));
+    const querySnapshot = await getDocs(q);
+    return !querySnapshot.empty;
+  } catch (error) {
+    console.error('Error checking user existence:', error);
+    return false;
+  }
+};
+
+// Create user document when user signs up
+auth.onAuthStateChanged(async (user) => {
   if (user) {
-    console.log('Authentication state: Signed in as', user.email);
-  } else {
-    console.log('Authentication state: Signed out');
+    try {
+      const usersRef = collection(db, 'users');
+      const q = query(usersRef, where('email', '==', user.email));
+      const querySnapshot = await getDocs(q);
+      
+      if (querySnapshot.empty) {
+        await addDoc(usersRef, {
+          email: user.email,
+          uid: user.uid,
+          createdAt: new Date(),
+          status: 'online'
+        });
+      }
+    } catch (error) {
+      console.error('Error creating user document:', error);
+    }
   }
 });
