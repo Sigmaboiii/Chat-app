@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { db, auth } from '../lib/firebase';
+import { db, auth, checkUserExists } from '../lib/firebase';
 import {
   collection,
   addDoc,
@@ -80,14 +80,26 @@ export const useFriendStore = create<FriendState>((set, get) => ({
   },
   
   sendFriendRequest: async (email: string) => {
-    if (!auth.currentUser) throw new Error('Not authenticated');
-    if (email === auth.currentUser.email) throw new Error('Cannot add yourself');
+    if (!auth.currentUser) {
+      throw new Error('You must be logged in to send friend requests');
+    }
+    
+    if (email === auth.currentUser.email) {
+      throw new Error('You cannot send a friend request to yourself');
+    }
 
-    // Check if request already exists
+    // Check if the user exists
+    const userExists = await checkUserExists(email);
+    if (!userExists) {
+      throw new Error('User not found');
+    }
+
+    // Check for existing requests
     const existingRequestsQuery = query(
       collection(db, 'friendRequests'),
       where('from', '==', auth.currentUser.email),
-      where('to', '==', email)
+      where('to', '==', email),
+      where('status', '==', 'pending')
     );
     
     const existingRequests = await getDocs(existingRequestsQuery);
@@ -111,54 +123,70 @@ export const useFriendStore = create<FriendState>((set, get) => ({
     });
 
     if (alreadyFriends) {
-      throw new Error('Already friends with this user');
+      throw new Error('You are already friends with this user');
     }
 
-    const requestsRef = collection(db, 'friendRequests');
-    await addDoc(requestsRef, {
-      from: auth.currentUser.email,
-      to: email,
-      status: 'pending',
-      timestamp: serverTimestamp(),
-    });
+    try {
+      const requestsRef = collection(db, 'friendRequests');
+      await addDoc(requestsRef, {
+        from: auth.currentUser.email,
+        to: email,
+        status: 'pending',
+        timestamp: serverTimestamp(),
+      });
 
-    toast.success('Friend request sent!');
+      toast.success('Friend request sent successfully!');
+    } catch (error) {
+      console.error('Error sending friend request:', error);
+      throw new Error('Failed to send friend request. Please try again.');
+    }
   },
 
   acceptRequest: async (requestId: string) => {
     if (!auth.currentUser) throw new Error('Not authenticated');
 
-    const requestRef = doc(db, 'friendRequests', requestId);
-    const request = get().pendingRequests.find(r => r.id === requestId);
-    
-    if (!request) return;
+    try {
+      const requestRef = doc(db, 'friendRequests', requestId);
+      const request = get().pendingRequests.find(r => r.id === requestId);
+      
+      if (!request) return;
 
-    // Create friendship
-    const friendsRef = collection(db, 'friends');
-    await addDoc(friendsRef, {
-      users: [request.from, request.to],
-      status: 'online',
-      createdAt: serverTimestamp()
-    });
+      // Create friendship document
+      const friendsRef = collection(db, 'friends');
+      await addDoc(friendsRef, {
+        users: [request.from, request.to],
+        status: 'online',
+        createdAt: serverTimestamp()
+      });
 
-    // Update request status
-    await updateDoc(requestRef, { status: 'accepted' });
+      // Update request status
+      await updateDoc(requestRef, { status: 'accepted' });
 
-    // Create a chat room
-    const chatRef = collection(db, 'chats');
-    await addDoc(chatRef, {
-      participants: [request.from, request.to],
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    });
+      // Create chat room
+      const chatRef = collection(db, 'chats');
+      await addDoc(chatRef, {
+        participants: [request.from, request.to],
+        createdAt: serverTimestamp(),
+        lastMessage: null,
+        updatedAt: serverTimestamp(),
+      });
 
-    toast.success('Friend request accepted!');
+      toast.success('Friend request accepted!');
+    } catch (error) {
+      console.error('Error accepting friend request:', error);
+      toast.error('Failed to accept friend request. Please try again.');
+    }
   },
 
   rejectRequest: async (requestId: string) => {
-    const requestRef = doc(db, 'friendRequests', requestId);
-    await deleteDoc(requestRef);
-    toast.success('Friend request rejected');
+    try {
+      const requestRef = doc(db, 'friendRequests', requestId);
+      await deleteDoc(requestRef);
+      toast.success('Friend request rejected');
+    } catch (error) {
+      console.error('Error rejecting friend request:', error);
+      toast.error('Failed to reject friend request. Please try again.');
+    }
   },
 
   startChat: async (friendId: string) => {
