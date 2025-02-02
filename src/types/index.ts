@@ -12,6 +12,15 @@ export interface Friend {
   status: 'online' | 'offline' | 'idle';
   avatarAnimation?: string;
   chatGems: number;
+  presence?: {
+    status: 'online' | 'offline' | 'idle';
+    activity?: {
+      type: 'spotify' | 'game' | 'app';
+      name: string;
+      details?: string;
+    };
+    lastSeen?: number;
+  };
 }
 
 export interface Message {
@@ -20,6 +29,10 @@ export interface Message {
   content: string;
   timestamp: number;
   animation?: string;
+  sound?: {
+    id: string;
+    url: string;
+  };
 }
 
 export interface Chat {
@@ -32,9 +45,10 @@ export interface Chat {
 export interface Animation {
   id: string;
   name: string;
-  type: 'message' | 'avatar';
-  preview: string; // URL to the preview
+  type: 'message' | 'avatar' | 'sound';
+  preview: string;
   price: number;
   description: string;
-  modelUrl?: string; // For 3D models
+  modelUrl?: string;
+  soundUrl?: string;
 }
